@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Data (don't commit raw files if large — sample data is committed)
+# data/*.csv  # keep sample data in repo for reviewers
+
+# Postgres
+pgdata/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Generated report (rebuilt by `python main.py report`)
+REPORT.md
