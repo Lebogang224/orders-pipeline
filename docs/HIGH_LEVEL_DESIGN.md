@@ -49,9 +49,10 @@ A brittle pipeline would crash or silently corrupt the warehouse. The expected s
 +-----------------------------------------------------------+
 |                     Python ETL (main.py)                  |
 |                                                           |
-|   EXTRACT  -->  TRANSFORM  -->  QUALITY  -->  LOAD        |
-|   (pandas)      (pandas)        (checks)      (psycopg v3 |
-|                                                COPY)      |
+|   EXTRACT  -->  TRANSFORM (+ DQ checks)  -->  LOAD        |
+|   (pandas)      (pandas — validate/quarantine)            |
+|                                                (psycopg v3 |
+|                                                 COPY)     |
 |                                                           |
 +-----+-----------------------------+-----------------------+
       |                             |
@@ -93,9 +94,9 @@ A brittle pipeline would crash or silently corrupt the warehouse. The expected s
 | **Language** | Python 3.11 | Within "3.10+" required; stable, broad library support |
 | **Ingestion** | pandas | Prescribed; handles CSV + JSONL + dtype coercion natively |
 | **Database driver** | psycopg v3 | Prescribed; modern async-capable, clean API, `COPY` support |
-| **Database** | PostgreSQL 16 | Within "14+"; latest stable LTS |
-| **DDL** | SQLAlchemy 2 Core | Optional in brief; cleaner than raw SQL for DDL, but we emit plain SQL via the Core dialect so the output is driver-agnostic |
-| **Config** | Pydantic Settings + YAML | Type-safe config with env-var overrides; YAML for human editing |
+| **Database** | PostgreSQL 17 | Within "14+"; latest stable |
+| **DDL** | Plain SQL (`schema.sql`, `views.sql`) | SQLAlchemy was listed as optional in the brief; plain SQL keeps the deliverable driver-agnostic and reviewer-readable. Applied via psycopg in `src/db/ddl.py`. |
+| **Config** | Pydantic + YAML + env interpolation | Type-safe config; `${VAR:-default}` placeholders so it works out of the box without `.env` |
 | **Logging** | Python `logging` (stdlib) | Prescribed "equivalent" accepted; stdlib keeps dependency surface minimal |
 | **Orchestration** | Plain Python CLI (`main.py`) | Brief asks for "single command"; no need for Airflow/Prefect at this scale |
 | **Infra** | Docker Compose | `docker compose up` → Postgres ready. Makes the reviewer's setup 30 seconds |
@@ -138,8 +139,10 @@ A brittle pipeline would crash or silently corrupt the warehouse. The expected s
 1. Filter `quantity > 0 AND unit_price > 0` — violators → quarantine
 2. Validate `order_id` exists in clean orders — missing FK → quarantine
 
-### 5.3 Quality
-Before load, the pipeline emits counts:
+### 5.3 Quality (integrated into Transform)
+Quality checks live inside the transform layer rather than a separate stage —
+each validation produces a (clean, quarantine) split with an explicit reason.
+The pipeline logs counts at every step:
 - rows read
 - rows passed
 - rows quarantined (by reason)

@@ -41,10 +41,10 @@ orders-pipeline/
 │   ├── etl/
 │   │   ├── __init__.py
 │   │   ├── extract.py         # Read files → DataFrames
-│   │   ├── transform.py       # Cleaning per entity
-│   │   ├── quality.py         # Pre-load DQ checks
-│   │   ├── quarantine.py      # Bad-row splitter
-│   │   └── load.py            # COPY into Postgres
+│   │   ├── transform.py       # Cleaning + DQ per entity (quality merged in)
+│   │   ├── quarantine.py      # Bad-row splitter helper
+│   │   ├── load.py            # COPY into Postgres
+│   │   └── pipeline.py        # Orchestrator: extract → transform → load
 │   └── agent/
 │       ├── __init__.py
 │       └── report_agent.py    # Stretch: LangChain + Groq
@@ -54,9 +54,8 @@ orders-pipeline/
 │   └── order_items.csv
 └── tests/
     ├── __init__.py
-    ├── test_transform.py
-    ├── test_quality.py
-    └── test_quarantine.py
+    ├── test_transform.py      # 25 tests covering all validation rules
+    └── test_quarantine.py     # 9 tests covering split/audit behaviour
 ```
 
 ---
@@ -351,10 +350,18 @@ class Config(BaseModel):
     agent: AgentConfig
 
 def load_config(path: str = "config.yaml") -> Config:
-    raw = Path(path).read_text()
-    # simple ${VAR} interpolation from env
-    raw = re.sub(r"\$\{(\w+)\}", lambda m: os.environ.get(m.group(1), ""), raw)
+    raw = Path(path).read_text(encoding="utf-8")
+    # ${VAR:-default} interpolation: works out of the box without a .env file
+    raw = _interpolate(raw)
     return Config(**yaml.safe_load(raw))
+
+def _interpolate(text: str) -> str:
+    """Replace ${VAR:-default} and ${VAR} with env values; fall back to default."""
+    def replacer(match: re.Match) -> str:
+        var = match.group(1)
+        default = match.group(3) or ""
+        return os.environ.get(var, default)
+    return re.sub(r"\$\{(\w+)(:-([^}]*))?\}", replacer, text)
 ```
 
 ---
@@ -370,7 +377,7 @@ import pandas as pd
 EMAIL_RE = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 ALLOWED_STATUSES = {"placed", "shipped", "cancelled", "refunded"}
 
-def transform_customers(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def transform_customers(df: pd.DataFrame, cfg: Config) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Returns (clean_df, quarantine_df).
 
@@ -378,23 +385,26 @@ def transform_customers(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
       1. Normalize email (strip, lowercase)
       2. Reject rows with invalid email shape
       3. Parse signup_date → date; reject unparseable
-      4. Deduplicate on email: keep earliest signup_date
-      5. Cast is_active → bool
+      4. Cast is_active → bool
+      5. Handle null country_code per cfg.etl.allow_null_country_code
+      6. Deduplicate on email: keep earliest signup_date
+      7. Cast customer_id → Int64
     """
 
-def transform_orders(df: pd.DataFrame, valid_customer_ids: set[int]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def transform_orders(df: pd.DataFrame, valid_customer_ids: set, cfg: Config) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Returns (clean_df, quarantine_df).
 
     Steps:
-      1. Parse order_ts with `pd.to_datetime(errors='coerce', utc=True)`
+      1. Parse order_ts with `pd.to_datetime(errors='coerce', utc=True, format='mixed')`
       2. Reject rows with unparseable timestamps
       3. Reject status ∉ ALLOWED_STATUSES
       4. Reject customer_id ∉ valid_customer_ids
-      5. Cast total_amount → Decimal; reject negative
+      5. Cast total_amount → numeric; reject negative
+      6. Cast order_id, customer_id → Int64
     """
 
-def transform_order_items(df: pd.DataFrame, valid_order_ids: set[int]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def transform_order_items(df: pd.DataFrame, valid_order_ids: set, cfg: Config) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Returns (clean_df, quarantine_df).
 
@@ -413,22 +423,53 @@ def transform_order_items(df: pd.DataFrame, valid_order_ids: set[int]) -> Tuple[
 
 ```python
 # src/etl/load.py (excerpt)
+import math
 import psycopg
 from psycopg import sql
 
-def copy_dataframe(conn: psycopg.Connection, table: str, df: pd.DataFrame) -> int:
-    if df.empty:
+def _copy_df(conn: psycopg.Connection, table: str,
+             df: pd.DataFrame, columns: list[str]) -> int:
+    if df is None or df.empty:
         return 0
-    cols = list(df.columns)
-    query = sql.SQL("COPY {} ({}) FROM STDIN WITH (FORMAT CSV)").format(
+
+    # Reorder to schema column order; replace NA/NaT/NaN with None
+    out = pd.DataFrame(index=df.index)
+    for col in columns:
+        out[col] = df[col] if col in df.columns else None
+    out = out.where(pd.notnull(out), other=None)
+
+    copy_sql = sql.SQL("COPY {} ({}) FROM STDIN WITH (FORMAT TEXT, NULL '')").format(
         sql.Identifier(table),
-        sql.SQL(", ").join(map(sql.Identifier, cols)),
+        sql.SQL(", ").join(sql.Identifier(c) for c in columns),
     )
-    with conn.cursor().copy(query) as cp:
-        for row in df.itertuples(index=False, name=None):
-            cp.write_row(row)
-    return len(df)
+
+    def _clean_row(row):
+        # Last-line defence: pandas itertuples can still emit float NaN
+        # even after .where(). psycopg COPY needs Python None for SQL NULL.
+        return tuple(
+            None if (v is None
+                     or (isinstance(v, float) and math.isnan(v))
+                     or (isinstance(v, str) and v.lower() in ("nan","nat","none","<na>")))
+            else v
+            for v in row
+        )
+
+    with conn.cursor().copy(copy_sql) as cp:
+        for row in out.itertuples(index=False, name=None):
+            cp.write_row(_clean_row(row))
+    return len(out)
 ```
+
+**Why FORMAT TEXT + NULL '':**
+The TEXT format combined with `NULL ''` makes empty strings become SQL NULL,
+which matches how pandas serialises missing values. CSV format would require
+escaping rules we don't need here.
+
+**Why _clean_row:**
+`pd.DataFrame.where(notnull, other=None)` doesn't fully prevent float NaN from
+re-appearing in `itertuples` output. psycopg COPY would otherwise send the
+literal string `'nan'` and Postgres would reject it. The helper coerces
+remaining NaN values back to Python `None`.
 
 **Why `COPY` over batched INSERT:**
 - 10-100× throughput at scale
@@ -500,13 +541,14 @@ Structured-ish logs (not JSON — overkill for this scale) but with consistent k
 
 **Unit tests only** — no DB round-trips. Keeps the test suite fast and deterministic.
 
-| File | What it tests |
-|---|---|
-| `test_transform.py` | Happy path + each quarantine rule for all 3 entities |
-| `test_quality.py`   | Date parsing across all messy formats in sample data |
-| `test_quarantine.py`| Quarantine DF shape is correct (includes audit columns) |
+| File | Tests | What it covers |
+|---|---|---|
+| `test_transform.py` | 25 | Happy path + each quarantine rule for all 3 entities; datetime format variations; UTC normalisation |
+| `test_quarantine.py` | 9 | `split()` correctness, audit column attachment, str coercion, no input mutation |
 
-Target coverage: ~80% on `src/etl/*.py`. DB / load layer tested manually via `docker compose up && python main.py run` and verified via SQL views.
+**Total: 35 tests, all passing in ~19 seconds, no database required.**
+
+DB / load layer is verified manually via `python main.py run` followed by inspecting the SQL views (notably `v_quarantine_summary`).
 
 ---
 

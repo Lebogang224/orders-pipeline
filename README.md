@@ -81,10 +81,10 @@ orders-pipeline/
 ├── main.py                  # CLI entry point (init / run / report / truncate)
 ├── requirements.txt
 │
-├── data/                    # Source files (not committed)
-│   ├── customers.csv
-│   ├── orders.jsonl
-│   └── order_items.csv
+├── data/                    # Sample source files (committed for reviewers)
+│   ├── customers.csv        # 6 rows incl. invalid email + duplicate
+│   ├── orders.jsonl         # 10 rows incl. unknown FK + invalid status
+│   └── order_items.csv      # 12 rows incl. zero quantity + zero price
 │
 ├── src/
 │   ├── config.py            # Pydantic config models + load_config()
