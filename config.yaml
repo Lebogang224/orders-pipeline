@@ -2,8 +2,8 @@ database:
   host: ${POSTGRES_HOST:-localhost}
   port: ${POSTGRES_PORT:-5432}
   database: ${POSTGRES_DB:-orders}
-  user: ${POSTGRES_USER:-orders_user}
-  password: ${POSTGRES_PASSWORD:-orderspipeline}
+  user: ${POSTGRES_USER:-postgres}
+  password: ${POSTGRES_PASSWORD:-postgres123}
 
 files:
   customers:   ./data/customers.csv

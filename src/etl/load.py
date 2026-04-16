@@ -100,8 +100,10 @@ def _copy_df(
     for col in columns:
         out[col] = df[col] if col in df.columns else None
 
-    # Replace pandas NA/NaT with None so psycopg sends SQL NULL
+    # Replace pandas NA/NaT/NaN with None so psycopg sends SQL NULL
     out = out.where(pd.notnull(out), other=None)
+    # Also catch string "nan"/"NaT"/"None" that pandas sometimes produces
+    out = out.replace({"nan": None, "NaT": None, "None": None, "<NA>": None})
 
     col_sql = sql.SQL(", ").join(sql.Identifier(c) for c in columns)
     copy_sql = sql.SQL("COPY {} ({}) FROM STDIN WITH (FORMAT TEXT, NULL '')").format(
@@ -111,9 +113,25 @@ def _copy_df(
     t0 = time.perf_counter()
     rows_loaded = 0
 
+    import math
+
+    def _clean_row(row):
+        """Convert float NaN and string 'nan' to None for SQL NULL."""
+        result = []
+        for v in row:
+            if v is None:
+                result.append(None)
+            elif isinstance(v, float) and math.isnan(v):
+                result.append(None)
+            elif isinstance(v, str) and v.lower() in ("nan", "nat", "none", "<na>"):
+                result.append(None)
+            else:
+                result.append(v)
+        return tuple(result)
+
     with conn.cursor().copy(copy_sql) as cp:
         for row in out.itertuples(index=False, name=None):
-            cp.write_row(row)
+            cp.write_row(_clean_row(row))
             rows_loaded += 1
 
     elapsed = int((time.perf_counter() - t0) * 1000)

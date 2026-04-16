@@ -89,9 +89,9 @@ def transform_customers(
     )
 
     # ── Step 5: country_code ─────────────────────────────────────────────────
-    working["country_code"] = working["country_code"].str.strip().str.upper()
+    working["country_code"] = working["country_code"].str.strip().str.upper().replace("", None)
     working["country_code"] = working["country_code"].where(
-        working["country_code"].notna() & (working["country_code"] != ""), other=None
+        working["country_code"].notna(), other=None
     )
     if not cfg.etl.allow_null_country_code:
         valid_cc_mask = working["country_code"].notna()
