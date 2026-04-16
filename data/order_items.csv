@@ -1,0 +1,13 @@
+order_id,line_no,sku,quantity,unit_price,category
+1001,1,A-001,1,250.50,Electronics
+1002,1,B-010,2,60.00,Home
+1003,1,C-100,1,75.00,Toys
+1004,1,D-222,1,60.00,Books
+1004,2,D-333,0,45.00,Books
+1005,1,E-777,1,0.00,Electronics
+1006,1,F-900,3,16.30,Beauty
+1007,1,G-321,1,10.00,Stationery
+1008,1,H-654,2,110.00,Sports
+1008,2,H-655,1,0.00,Sports
+1009,1,A-001,1,250.50,Electronics
+1010,1,I-111,1,15.00,Toys

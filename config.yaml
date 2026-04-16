@@ -1,0 +1,25 @@
+database:
+  host: ${POSTGRES_HOST:-localhost}
+  port: ${POSTGRES_PORT:-5432}
+  database: ${POSTGRES_DB:-orders}
+  user: ${POSTGRES_USER:-orders_user}
+  password: ${POSTGRES_PASSWORD:-orderspipeline}
+
+files:
+  customers:   ./data/customers.csv
+  orders:      ./data/orders.jsonl
+  order_items: ./data/order_items.csv
+
+etl:
+  batch_size: 10000
+  allow_null_country_code: true
+  default_currency: ZAR
+
+logging:
+  level: INFO
+  format: "%(asctime)s | %(levelname)-7s | %(name)-20s | %(message)s"
+
+agent:
+  enabled: true
+  provider: groq
+  model: llama-3.3-70b-versatile

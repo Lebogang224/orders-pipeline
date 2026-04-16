@@ -1,0 +1,7 @@
+customer_id,email,full_name,signup_date,country_code,is_active
+1,jane.doe@example.com,Jane Doe,2024-01-10,ZA,true
+2,JOHN.Smith@Example.com,John Smith,2024-02-15,ZA,true
+3,alex.null@example.com,Alex Null,2024-01-20,,true
+4,dup.email@EXAMPLE.com,Dupe A,2024-01-01,ZA,true
+5,dup.email@example.com,Dupe B,2024-02-01,ZA,true
+6,bademail,No At Sign,2024-01-05,ZA,true
