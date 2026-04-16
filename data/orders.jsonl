@@ -1,0 +1,10 @@
+{"order_id": 1001, "customer_id": 1, "order_ts": "2024-03-01T08:12:00+02:00", "status": "placed", "total_amount": 250.50, "currency": "ZAR"}
+{"order_id": 1002, "customer_id": 2, "order_ts": "2024-03-01T09:00:00Z", "status": "shipped", "total_amount": 120.00, "currency": "ZAR"}
+{"order_id": 1003, "customer_id": 999, "order_ts": "2024-03-02T10:00:00+02:00", "status": "placed", "total_amount": 75.00, "currency": "ZAR"}
+{"order_id": 1004, "customer_id": 3, "order_ts": "2024-03-03 11:30:00", "status": "processing", "total_amount": 60.00, "currency": "ZAR"}
+{"order_id": 1005, "customer_id": 4, "order_ts": "2024/03/04 12:00:00", "status": "cancelled", "total_amount": 0.00, "currency": "ZAR"}
+{"order_id": 1006, "customer_id": 5, "order_ts": "2024-03-05T13:15:00+02:00", "status": "refunded", "total_amount": 48.90, "currency": "ZAR"}
+{"order_id": 1007, "customer_id": 6, "order_ts": "2024-03-05T14:00:00Z", "status": "shipped", "total_amount": 10.00, "currency": "ZAR"}
+{"order_id": 1008, "customer_id": 2, "order_ts": "2024-03-06T15:45:00Z", "status": "placed", "total_amount": 220.00, "currency": "ZAR"}
+{"order_id": 1009, "customer_id": 1, "order_ts": "2024-03-07T09:20:00+02:00", "status": "refunded", "total_amount": 250.50, "currency": "ZAR"}
+{"order_id": 1010, "customer_id": 3, "order_ts": "2024-03-07T10:00:00Z", "status": "shipped", "total_amount": 15.00, "currency": "ZAR"}
