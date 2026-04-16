@@ -62,7 +62,7 @@ def _fetch_metrics(cfg: Config) -> dict:
         with get_connection(cfg) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
 
-                cur.execute("SELECT * FROM v_daily_metrics ORDER BY order_date DESC LIMIT 7")
+                cur.execute("SELECT * FROM v_daily_metrics ORDER BY date DESC LIMIT 7")
                 results["daily_metrics"] = cur.fetchall()
 
                 cur.execute("SELECT * FROM v_top_customers LIMIT 5")
@@ -146,7 +146,7 @@ def _build_prompt(metrics: dict) -> str:
     ]
     for row in daily:
         lines.append(
-            f"  {row.get('order_date')} | {row.get('orders_count')} | "
+            f"  {row.get('date')} | {row.get('orders_count')} | "
             f"R{row.get('total_revenue')} | R{row.get('average_order_value')}"
         )
 
@@ -160,14 +160,14 @@ def _build_prompt(metrics: dict) -> str:
     lines += ["", "## Top 5 SKUs (sku | revenue | units_sold)"]
     for row in top_s:
         lines.append(
-            f"  {row.get('sku')} — R{row.get('total_revenue')} / {row.get('units_sold')} units"
+            f"  {row.get('sku')} — R{row.get('revenue')} / {row.get('units_sold')} units"
         )
 
     lines += ["", "## Data quality (quarantine summary)"]
     for row in q_sum:
         lines.append(
-            f"  [{row.get('source_table')}] {row.get('quarantine_reason')}: "
-            f"{row.get('row_count')} rows"
+            f"  [{row.get('entity')}] {row.get('quarantine_reason')}: "
+            f"{row.get('rejected_rows')} rows"
         )
 
     lines += [
@@ -210,7 +210,7 @@ def _write_template_report(metrics: dict) -> None:
     ]
     for row in daily:
         lines.append(
-            f"| {row.get('order_date')} "
+            f"| {row.get('date')} "
             f"| {row.get('orders_count')} "
             f"| R{row.get('total_revenue')} "
             f"| R{row.get('average_order_value')} |"
@@ -241,7 +241,7 @@ def _write_template_report(metrics: dict) -> None:
     for row in top_s:
         lines.append(
             f"| {row.get('sku')} "
-            f"| R{row.get('total_revenue')} "
+            f"| R{row.get('revenue')} "
             f"| {row.get('units_sold')} "
             f"| #{row.get('revenue_rank')} "
             f"| #{row.get('units_rank')} |"
@@ -256,9 +256,9 @@ def _write_template_report(metrics: dict) -> None:
     ]
     for row in q_sum:
         lines.append(
-            f"| {row.get('source_table')} "
+            f"| {row.get('entity')} "
             f"| `{row.get('quarantine_reason')}` "
-            f"| {row.get('row_count')} |"
+            f"| {row.get('rejected_rows')} |"
         )
 
     if not q_sum:

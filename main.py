@@ -3,7 +3,7 @@ Orders Pipeline CLI.
 
 Commands:
   python main.py init      -- create schema + views (idempotent)
-  python main.py run       -- extract -> transform -> quality -> load
+  python main.py run       -- extract -> transform (incl. DQ) -> load
   python main.py report    -- generate REPORT.md (+ optional LLM agent)
   python main.py truncate  -- wipe all tables (dev only; requires --yes)
 """
