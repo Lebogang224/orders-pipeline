@@ -106,7 +106,7 @@ def _copy_df(
     out = out.replace({"nan": None, "NaT": None, "None": None, "<NA>": None})
 
     col_sql = sql.SQL(", ").join(sql.Identifier(c) for c in columns)
-    copy_sql = sql.SQL("COPY {} ({}) FROM STDIN WITH (FORMAT TEXT, NULL '')").format(
+    copy_sql = sql.SQL("COPY {} ({}) FROM STDIN WITH (FORMAT TEXT)").format(
         sql.Identifier(table), col_sql
     )
 
