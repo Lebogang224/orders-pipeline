@@ -19,6 +19,3 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
-
-# Generated report (rebuilt by `python main.py report`)
-REPORT.md
