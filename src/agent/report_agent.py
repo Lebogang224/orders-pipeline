@@ -62,7 +62,7 @@ def _fetch_metrics(cfg: Config) -> dict:
         with get_connection(cfg) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
 
-                cur.execute("SELECT * FROM v_daily_metrics ORDER BY date DESC LIMIT 7")
+                cur.execute("SELECT * FROM v_daily_metrics ORDER BY order_date DESC LIMIT 7")
                 results["daily_metrics"] = cur.fetchall()
 
                 cur.execute("SELECT * FROM v_top_customers LIMIT 5")
@@ -146,7 +146,7 @@ def _build_prompt(metrics: dict) -> str:
     ]
     for row in daily:
         lines.append(
-            f"  {row.get('date')} | {row.get('orders_count')} | "
+            f"  {row.get('order_date')} | {row.get('orders_count')} | "
             f"R{row.get('total_revenue')} | R{row.get('average_order_value')}"
         )
 
@@ -210,7 +210,7 @@ def _write_template_report(metrics: dict) -> None:
     ]
     for row in daily:
         lines.append(
-            f"| {row.get('date')} "
+            f"| {row.get('order_date')} "
             f"| {row.get('orders_count')} "
             f"| R{row.get('total_revenue')} "
             f"| R{row.get('average_order_value')} |"
