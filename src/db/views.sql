@@ -12,7 +12,7 @@
 -- 1. Daily metrics: orders_count, total_revenue, average_order_value
 CREATE OR REPLACE VIEW v_daily_metrics AS
 SELECT
-    (order_ts AT TIME ZONE 'UTC')::DATE  AS date,
+    (order_ts AT TIME ZONE 'UTC')::DATE  AS order_date,
     COUNT(*)                             AS orders_count,
     SUM(total_amount)                    AS total_revenue,
     ROUND(AVG(total_amount), 2)          AS average_order_value
