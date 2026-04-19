@@ -5,6 +5,7 @@ Commands:
   python main.py init      -- create schema + views (idempotent)
   python main.py run       -- extract -> transform (incl. DQ) -> load
   python main.py report    -- generate REPORT.md (+ optional LLM agent)
+  python main.py chat      -- conversational SQL agent (requires GROQ_API_KEY)
   python main.py truncate  -- wipe all tables (dev only; requires --yes)
 """
 import argparse
@@ -21,7 +22,7 @@ def main() -> None:
     )
     parser.add_argument(
         "command",
-        choices=["init", "run", "report", "truncate"],
+        choices=["init", "run", "report", "chat", "truncate"],
         help="Pipeline command to execute",
     )
     parser.add_argument(
@@ -56,6 +57,10 @@ def main() -> None:
     elif args.command == "report":
         from src.agent.report_agent import generate_report
         generate_report(cfg)
+
+    elif args.command == "chat":
+        from src.agent.sql_agent import run_chat
+        run_chat(cfg)
 
     elif args.command == "truncate":
         if not args.yes:
