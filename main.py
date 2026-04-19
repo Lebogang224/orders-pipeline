@@ -2,11 +2,12 @@
 Orders Pipeline CLI.
 
 Commands:
-  python main.py init      -- create schema + views (idempotent)
-  python main.py run       -- extract -> transform (incl. DQ) -> load
-  python main.py report    -- generate REPORT.md (+ optional LLM agent)
-  python main.py chat      -- conversational SQL agent (requires GROQ_API_KEY)
-  python main.py truncate  -- wipe all tables (dev only; requires --yes)
+  python main.py init             -- create schema + views (idempotent)
+  python main.py run              -- extract -> transform (incl. DQ) -> load
+  python main.py run --fresh      -- truncate first, then load (safe re-runs)
+  python main.py report           -- generate REPORT.md (+ optional LLM agent)
+  python main.py chat             -- conversational SQL agent (requires GROQ_API_KEY)
+  python main.py truncate --yes   -- wipe all tables (dev only)
 """
 import argparse
 import sys
@@ -35,6 +36,11 @@ def main() -> None:
         action="store_true",
         help="Confirm destructive operations (required for truncate)",
     )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="For `run`: truncate all tables before loading (idempotent re-runs)",
+    )
     args = parser.parse_args()
 
     # Load config + setup logging before anything else
@@ -51,7 +57,10 @@ def main() -> None:
         log.info("Schema and views applied successfully")
 
     elif args.command == "run":
-        from src.etl.pipeline import run
+        from src.etl.pipeline import run, truncate
+        if args.fresh:
+            log.info("--fresh flag set: truncating tables before load")
+            truncate(cfg)
         run(cfg)
 
     elif args.command == "report":

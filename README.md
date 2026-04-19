@@ -56,6 +56,12 @@ This applies `src/db/schema.sql` (tables + constraints) and `src/db/views.sql` (
 python main.py run
 ```
 
+For a safe re-run (truncates all tables first, then loads):
+
+```bash
+python main.py run --fresh
+```
+
 ### 6. Generate a report
 
 ```bash
