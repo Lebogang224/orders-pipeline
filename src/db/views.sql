@@ -15,11 +15,12 @@ DROP VIEW IF EXISTS v_daily_metrics CASCADE;
 CREATE VIEW v_daily_metrics AS
 SELECT
     (order_ts AT TIME ZONE 'UTC')::DATE  AS order_date,
+    (order_ts AT TIME ZONE 'UTC')::DATE  AS "date",        -- alias for dashboard compatibility
     COUNT(*)                             AS orders_count,
     SUM(total_amount)                    AS total_revenue,
     ROUND(AVG(total_amount), 2)          AS average_order_value
 FROM orders
-GROUP BY 1
+GROUP BY 1, 2
 ORDER BY 1;
 
 
