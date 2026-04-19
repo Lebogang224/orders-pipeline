@@ -10,7 +10,9 @@
 -- -----------------------------------------------------------------------------
 
 -- 1. Daily metrics: orders_count, total_revenue, average_order_value
-CREATE OR REPLACE VIEW v_daily_metrics AS
+-- DROP required because CREATE OR REPLACE cannot rename existing columns
+DROP VIEW IF EXISTS v_daily_metrics CASCADE;
+CREATE VIEW v_daily_metrics AS
 SELECT
     (order_ts AT TIME ZONE 'UTC')::DATE  AS order_date,
     COUNT(*)                             AS orders_count,
