@@ -1,14 +1,13 @@
 """
 Orders Pipeline — Streamlit Dashboard
 
-Walks through every stage of the pipeline visually:
-  Step 1  Schema        — tables and views created
-  Step 2  Data Cleaning — rows in / loaded / quarantined per entity + cascade
-  Step 3  Bulk Load     — live counts and revenue from the database
-  Step 4  Analytics     — daily metrics, top customers, top SKUs
+Visual dashboard of one pipeline run: schema → cleaning → bulk load → analytics.
 
 Run with:
     streamlit run app.py
+
+Narration for each section lives in docs/DASHBOARD_NARRATION.md —
+keep that open on a second screen while presenting.
 """
 import streamlit as st
 import pandas as pd
@@ -39,7 +38,6 @@ def _fetch():
         with get_connection(cfg) as conn:
             with conn.cursor(row_factory=dict_row) as cur:
 
-                # All counts in one round-trip
                 cur.execute("""
                     SELECT
                         (SELECT COUNT(*) FROM customers)              AS clean_customers,
@@ -90,10 +88,6 @@ data = _fetch()
 
 if data["error"]:
     st.error(f"Database unavailable: {data['error']}")
-    st.info(
-        "Run `python main.py init && python main.py run` to populate the database, "
-        "then refresh this page."
-    )
     st.stop()
 
 t        = data["totals"]
@@ -102,7 +96,6 @@ daily_df = data["daily_df"]
 cust_df  = data["cust_df"]
 sku_df   = data["sku_df"]
 
-# Derived totals (clean + quarantined = rows that came in)
 cust_total = t["clean_customers"] + t["q_customers"]
 ord_total  = t["clean_orders"]    + t["q_orders"]
 item_total = t["clean_items"]     + t["q_items"]
@@ -112,84 +105,27 @@ item_total = t["clean_items"]     + t["q_items"]
 # TITLE
 # ══════════════════════════════════════════════════════════════════════════════
 st.title("Orders Pipeline Dashboard")
-st.caption(
-    "End-to-end view of one pipeline run — schema design, data cleaning, "
-    "bulk load, and analytics. "
-    "Built for the LexisNexis / OfferZen Data Engineer Assessment."
-)
 st.divider()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 0 — THE RAW SOURCE DATA
 # ══════════════════════════════════════════════════════════════════════════════
-st.header("The Source Data — Before the Pipeline Runs")
-st.info(
-    "Three raw files arrive from upstream systems every day. "
-    "They are intentionally messy — mixed-case emails, duplicate records, "
-    "invalid status values, orphaned foreign keys, and zero-value line items. "
-    "A naive pipeline would crash on this data, or worse, silently load it corrupted. "
-    "This pipeline validates every row, quarantines the bad ones with an explicit reason, "
-    "and loads only the clean subset into PostgreSQL. "
-    "The tabs below show the data exactly as it arrives — problems and all."
-)
+st.header("The Source Data")
 
 tab1, tab2, tab3 = st.tabs(["customers.csv", "orders.jsonl", "order_items.csv"])
 
 with tab1:
     raw_customers = pd.read_csv("data/customers.csv", dtype=str)
     st.dataframe(raw_customers, use_container_width=True, hide_index=True)
-    st.warning(
-        "**Problems in this file:**\n\n"
-        "- **Row 2** — email is mixed-case (`JOHN.Smith@Example.com`). "
-        "Not invalid, but inconsistent. The pipeline lowercases and strips all emails before any check.\n\n"
-        "- **Rows 4 & 5** — two different rows share the same email address "
-        "(`dup.email@example.com` / `dup.email@EXAMPLE.com`). "
-        "After normalisation they are identical. The pipeline keeps the one with the earliest "
-        "`signup_date` and quarantines the other with reason `duplicate_email`.\n\n"
-        "- **Row 6** — email is `bademail` with no `@` symbol. "
-        "Fails the format check. Quarantined with reason `invalid_email_format`.\n\n"
-        "- **Row 3** — `country_code` is blank. Allowed — the pipeline treats this as NULL, "
-        "not an error."
-    )
 
 with tab2:
     raw_orders = pd.read_json("data/orders.jsonl", lines=True, dtype=str)
     st.dataframe(raw_orders, use_container_width=True, hide_index=True)
-    st.warning(
-        "**Problems in this file:**\n\n"
-        "- **Row 3** — `customer_id` is `999`, which does not exist in the customers file. "
-        "Quarantined with reason `missing_customer_fk`.\n\n"
-        "- **Row 4** — `status` is `processing`. "
-        "The allowed set is `placed`, `shipped`, `cancelled`, `refunded`. "
-        "Quarantined with reason `invalid_status`.\n\n"
-        "- **Rows 7 & 8** — `customer_id` values `6` and `5` map to customers that were "
-        "quarantined upstream (bad email and duplicate). "
-        "Because those customers never made it to the clean table, these orders have no valid "
-        "parent and cascade into quarantine with reason `missing_customer_fk`.\n\n"
-        "- **Mixed timestamp formats across all rows** — some use `+02:00` offset, "
-        "some use `Z`, one uses a space separator (`2024-03-03 11:30:00`), "
-        "one uses slashes (`2024/03/04 12:00:00`). "
-        "The pipeline normalises all of them to UTC in a single `pd.to_datetime` call."
-    )
 
 with tab3:
     raw_items = pd.read_csv("data/order_items.csv", dtype=str)
     st.dataframe(raw_items, use_container_width=True, hide_index=True)
-    st.warning(
-        "**Problems in this file:**\n\n"
-        "- **Row 5 (SKU D-333)** — `quantity` is `0`. "
-        "A line item with zero quantity has no business meaning. "
-        "Quarantined with reason `non_positive_quantity`.\n\n"
-        "- **Row 6 (SKU E-777)** — `unit_price` is `0.00`. "
-        "Quarantined with reason `non_positive_unit_price`.\n\n"
-        "- **Row 10 (SKU H-655)** — `unit_price` is `0.00`. "
-        "Same rule, same reason.\n\n"
-        "- **Rows 3, 7, 8 (SKUs C-100, G-321, part of order 1005)** — these line items belong "
-        "to orders that were quarantined upstream. "
-        "Because those orders never reached the clean table, these items have no valid parent "
-        "and cascade into quarantine with reason `missing_order_fk`."
-    )
 
 st.divider()
 
@@ -198,54 +134,21 @@ st.divider()
 # STEP 1 — SCHEMA
 # ══════════════════════════════════════════════════════════════════════════════
 st.header("Step 1 — Database Schema")
-st.info(
-    "Before any data moves, the pipeline creates the full database with a single command: "
-    "`python main.py init`. "
-    "**Three clean tables** enforce constraints at rest — email format, allowed status values, "
-    "positive quantities, and foreign-key integrity. "
-    "**Three quarantine tables** mirror those tables with all columns as `TEXT`, so a bad row "
-    "is never rejected at the schema level. Each quarantine table adds three columns: "
-    "`quarantine_reason`, `source_file`, and `ingested_at`. "
-    "This command is idempotent — safe to run any number of times."
-)
 
 col1, col2, col3 = st.columns(3)
-col1.metric(
-    label="Clean tables",
-    value=3,
-    help="customers · orders · order_items — with PK, FK, and CHECK constraints",
-)
-col2.metric(
-    label="Quarantine tables",
-    value=3,
-    help="quarantine_customers · quarantine_orders · quarantine_order_items",
-)
-col3.metric(
-    label="Analytics views",
-    value=8,
-    help=(
-        "v_daily_metrics · v_top_customers · v_top_skus · "
-        "v_dq_duplicate_emails · v_dq_orders_missing_customer · "
-        "v_dq_invalid_order_items · v_dq_invalid_order_status · v_quarantine_summary"
-    ),
-)
+col1.metric(label="Clean tables",      value=3)
+col2.metric(label="Quarantine tables", value=3)
+col3.metric(label="Analytics views",   value=8)
+
 st.divider()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 2 — DATA CLEANING
 # ══════════════════════════════════════════════════════════════════════════════
-st.header("Step 2 — Data Cleaning (Transform + Quarantine)")
-st.info(
-    "Every row is validated against business rules in the transform layer. "
-    "Bad rows are never deleted — they're quarantined with an explicit reason stamped on them. "
-    "Rejections **cascade**: a quarantined customer causes their orders to be quarantined too "
-    "(`missing_customer_fk`), and those orders' line items follow (`missing_order_fk`). "
-    "The quarantine tables become an audit log the data team can investigate and re-ingest from."
-)
+st.header("Step 2 — Data Cleaning")
 
-# ── Row funnel ─────────────────────────────────────────────────────────────────
-st.subheader("Row Funnel — Where Did Every Row Go?")
+st.subheader("Row Funnel")
 
 h = st.columns([2, 1, 1, 1])
 h[0].markdown("**Entity**")
@@ -267,14 +170,7 @@ for label, total, clean, quarantined in [
     else:
         row[3].success("0")
 
-# ── Quarantine breakdown ───────────────────────────────────────────────────────
-st.subheader("Quarantine Breakdown — Why Each Row Was Rejected")
-st.caption(
-    "Every rejected row has exactly one reason. "
-    "Rows rejected upstream cascade downward — "
-    "a bad customer causes missing_customer_fk on their orders, "
-    "which causes missing_order_fk on their line items."
-)
+st.subheader("Quarantine Breakdown")
 
 if not q_df.empty:
     st.dataframe(
@@ -296,15 +192,6 @@ st.divider()
 # STEP 3 — BULK LOAD
 # ══════════════════════════════════════════════════════════════════════════════
 st.header("Step 3 — Bulk Load")
-st.info(
-    "Clean rows land in PostgreSQL using psycopg v3's `COPY` protocol — "
-    "10–100x faster than batched `INSERT` statements because it streams rows "
-    "directly into the table without parsing individual SQL statements. "
-    "All six tables (3 clean + 3 quarantine) load inside a **single transaction**: "
-    "everything commits or nothing does. "
-    "If anything fails mid-run, the database rolls back completely — "
-    "the next run always starts from a known-clean state."
-)
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Customers loaded",    t["clean_customers"])
@@ -319,17 +206,7 @@ st.divider()
 # STEP 4 — ANALYTICS
 # ══════════════════════════════════════════════════════════════════════════════
 st.header("Step 4 — SQL Analytics Views")
-st.info(
-    "Eight views surface operational insights directly from the clean tables — "
-    "no application logic required. "
-    "`v_top_customers` and `v_top_skus` use the `RANK()` window function to rank "
-    "customers by lifetime spend and SKUs by revenue and units sold. "
-    "`v_daily_metrics` groups orders by day with a `WITH` CTE for clarity. "
-    "These views are the downstream interface: any BI tool, the report generator, "
-    "or this dashboard queries the views — not the raw tables."
-)
 
-# ── Daily revenue chart ────────────────────────────────────────────────────────
 st.subheader("Daily Revenue")
 if not daily_df.empty:
     chart_df = (
@@ -338,10 +215,7 @@ if not daily_df.empty:
         .rename(columns={"total_revenue": "Revenue (R)"})
     )
     st.bar_chart(chart_df)
-else:
-    st.caption("No daily data available.")
 
-# ── Top customers + top SKUs ───────────────────────────────────────────────────
 left, right = st.columns(2)
 
 with left:
@@ -371,8 +245,3 @@ with right:
             hide_index=True,
             use_container_width=True,
         )
-
-st.divider()
-st.caption(
-    "Lebogang Mphaga · Orders Pipeline · LexisNexis / OfferZen Data Engineer Assessment"
-)
