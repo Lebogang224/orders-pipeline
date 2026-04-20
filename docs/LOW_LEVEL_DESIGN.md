@@ -1,7 +1,7 @@
 # Orders Data Pipeline — Low-Level Design
 
 **Project:** Orders ETL Pipeline
-**Author:** Lebogang Mphaga
+**Author:** Lebogang Monyebudi
 **Date:** 2026-04-14
 **Version:** 1.0
 

@@ -1,7 +1,7 @@
 # Orders Data Pipeline — High-Level Design
 
 **Project:** Orders ETL Pipeline (OfferZen / LexisNexis Technical Vetting)
-**Author:** Lebogang Mphaga
+**Author:** Lebogang Monyebudi
 **Date:** 2026-04-14
 **Version:** 1.0
 

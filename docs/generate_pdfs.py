@@ -98,7 +98,7 @@ def header_footer(canvas, doc):
     canvas.setFont("Helvetica-Bold", 8)
     canvas.drawString(MARGIN, PAGE_H - 7.5*mm, doc.title or "")
     canvas.setFont("Helvetica", 8)
-    canvas.drawRightString(PAGE_W - MARGIN, PAGE_H - 7.5*mm, "Lebogang Mphaga")
+    canvas.drawRightString(PAGE_W - MARGIN, PAGE_H - 7.5*mm, "Lebogang Monyebudi")
     # Bottom bar
     canvas.setFillColor(LIGHT_GRAY)
     canvas.rect(0, 0, PAGE_W, 10*mm, fill=1, stroke=0)

@@ -1,6 +1,6 @@
 # Solution Notes — Orders Data Pipeline
 
-**Author:** Lebogang Mphaga
+**Author:** Lebogang Monyebudi
 **Assessment:** LexisNexis / OfferZen — Data Engineer Technical Vetting
 **Date:** 2026-04-14
 
